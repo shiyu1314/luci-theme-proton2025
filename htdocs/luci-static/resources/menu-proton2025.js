@@ -642,98 +642,6 @@ return baseclass.extend({
   },
 
   /**
-   * WiFi frequency detection based on real data from radio rows
-   * Adds data-freq attribute to wifinet rows for CSS styling
-   * Works with any device names: radio0, MT7981_1_1, ath0, wl0, etc.
-   */
-  markWifiFrequencies() {
-    const wirelessTable = document.querySelector("#cbi-wireless");
-    if (!wirelessTable) return;
-
-    // Map to store radio frequencies: "radio0" -> "2.4", "MT7981_1_1" -> "5", etc.
-    const radioFreqMap = new Map();
-
-    // Step 1: Parse radio device rows (marked by data-radio-device attribute from header.ut)
-    const radioRows = wirelessTable.querySelectorAll("tr[data-radio-device]");
-    radioRows.forEach((row) => {
-      const radioId = row.getAttribute("data-radio-device"); // e.g., "radio0" or "MT7981_1_1"
-      const text = row.textContent || "";
-
-      // Detect frequency from text content
-      // 2.4 GHz: "2.412 GHz", "2.437 ГГц", "Channel 1 (2412 MHz)", etc.
-      // 5 GHz: "5.180 GHz", "5.745 ГГц", "Channel 36 (5180 MHz)", etc.
-      // 6 GHz: "6.xxx GHz", etc.
-
-      let freq = null;
-      if (
-        /\b2[.,]\d{3}\s*(ГГц|GHz|MHz)/i.test(text) ||
-        /\b24[0-4]\d\s*MHz/i.test(text)
-      ) {
-        freq = "2.4";
-      } else if (
-        /\b5[.,]\d{3}\s*(ГГц|GHz|MHz)/i.test(text) ||
-        /\b5[0-9]{3}\s*MHz/i.test(text)
-      ) {
-        freq = "5";
-      } else if (
-        /\b6[.,]\d{3}\s*(ГГц|GHz|MHz)/i.test(text) ||
-        /\b6[0-9]{3}\s*MHz/i.test(text)
-      ) {
-        freq = "6";
-      }
-
-      if (freq && radioId) {
-        radioFreqMap.set(radioId, freq);
-        row.setAttribute("data-freq", freq);
-      }
-    });
-
-    // Step 2: Assign frequencies to WiFi network rows (those without data-radio-device)
-    const wifinetRows = wirelessTable.querySelectorAll(
-      "tr[data-section-id]:not([data-radio-device])",
-    );
-    wifinetRows.forEach((row) => {
-      // Skip if already processed
-      if (row.hasAttribute("data-freq")) return;
-
-      // Find parent radio by looking at preceding rows
-      let currentRow = row.previousElementSibling;
-      let parentRadio = null;
-
-      while (currentRow) {
-        const radioDevice = currentRow.getAttribute("data-radio-device");
-        if (radioDevice) {
-          parentRadio = radioDevice;
-          break;
-        }
-        currentRow = currentRow.previousElementSibling;
-      }
-
-      // Fallback: check badge text for device name reference
-      if (!parentRadio) {
-        const deviceCell = row.querySelector('[data-name="_badge"]');
-        if (deviceCell) {
-          const badgeText = deviceCell.textContent || "";
-          // Look for any known wireless device name in the badge
-          if (window._protonWirelessDevices) {
-            for (const devName of window._protonWirelessDevices) {
-              if (badgeText.indexOf(devName) !== -1) {
-                parentRadio = devName;
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      // Apply frequency from parent radio
-      if (parentRadio && radioFreqMap.has(parentRadio)) {
-        row.setAttribute("data-freq", radioFreqMap.get(parentRadio));
-      }
-    });
-  },
-
-  /**
    * Wireless actions dropdown menu (⋮)
    * Converts action buttons in #cbi-wireless into a compact dropdown
    */
@@ -820,8 +728,6 @@ return baseclass.extend({
     // Run on DOM changes (for dynamic content like LuCI updates)
     const observer = new MutationObserver(() => {
       setTimeout(installDropdowns, 150);
-      // Also update WiFi frequencies when table changes
-      this.markWifiFrequencies();
     });
 
     const wirelessContainer =
@@ -830,9 +736,6 @@ return baseclass.extend({
       childList: true,
       subtree: true,
     });
-
-    // Initial frequency marking
-    setTimeout(() => this.markWifiFrequencies(), 350);
   },
 
   /**

@@ -1460,23 +1460,10 @@
 
   // Translation helper
   function tr(key) {
-    if (
-      typeof window.protonTranslations !== "undefined" &&
-      window.protonTranslations[key]
-    ) {
-      return window.protonTranslations[key];
+    if (typeof window.protonT === "function") {
+      return window.protonT(key);
     }
-    // Fallback translations
-    const fallbacks = {
-      "Confirm Reboot": "Подтвердите перезагрузку",
-      "Are you sure you want to reboot the system?":
-        "Вы уверены, что хотите перезагрузить систему?",
-      "This action will restart your router and temporarily interrupt network connectivity.":
-        "Это действие перезапустит ваш роутер и временно прервет сетевое соединение.",
-      "Reboot Now": "Перезагрузить",
-      Cancel: "Отмена",
-    };
-    return fallbacks[key] || key;
+    return key;
   }
 
   function initRebootConfirmation() {

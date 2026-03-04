@@ -312,7 +312,7 @@
 :root[data-theme="light"] #view>.controls .cbi-button-action,
 :root[data-theme="light"] #packages .cbi-button-action,
 :root[data-theme="light"] #packages .cbi-button-positive,
-:root[data-theme="light"] #cbi-wireless tr[data-freq] td[data-name="_badge"] .ifacebadge::after,
+:root[data-theme="light"] #cbi-wireless tr[data-band] td[data-name="_badge"] .ifacebadge::after,
 :root[data-theme="light"] .cbi-dynlist>.item::after,
 :root[data-theme="light"] .ifacebox-head.active,
 :root[data-theme="light"] #view>.controls label:has(input[type="radio"]:checked) {
@@ -558,6 +558,12 @@ a:active {
 #menubar a:hover,
 #mainmenu a:hover {
     transform: none;
+}
+
+/* Remove browser default tap highlight on menu links */
+#menubar a,
+#mainmenu a {
+    -webkit-tap-highlight-color: transparent;
 }
 
 #indicators>[data-style="inactive"] {
@@ -1311,7 +1317,8 @@ input[type="range"]::-webkit-slider-thumb {
     cursor: pointer;
     transition: var(--proton-transition);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    margin-top: -6px; /* Center thumb on track */
+    margin-top: -6px;
+    /* Center thumb on track */
 }
 
 /* Firefox - Thumb */
@@ -2010,17 +2017,38 @@ table.assoclist td[data-title="Скорость приёма / отправки"
     margin-top: 0;
 }
 
+/* Цвета по band — CSS единственный источник правды для визуала */
+#cbi-wireless tr[data-band="2g"] {
+    --freq-color: #ff9800;
+    --freq-color-dark: #ff6f00;
+    --freq-color-rgb: 255, 152, 0;
+    --freq-label: "2.4 GHz";
+}
+
+#cbi-wireless tr[data-band="5g"] {
+    --freq-color: #00bcd4;
+    --freq-color-dark: #0097a7;
+    --freq-color-rgb: 0, 188, 212;
+    --freq-label: "5 GHz";
+}
+
+#cbi-wireless tr[data-band="6g"] {
+    --freq-color: #a78bfa;
+    --freq-color-dark: #8b5cf6;
+    --freq-color-rgb: 167, 139, 250;
+    --freq-label: "6 GHz";
+}
+
+#cbi-wireless tr[data-band="60g"] {
+    --freq-color: #ec4899;
+    --freq-color-dark: #db2777;
+    --freq-color-rgb: 236, 72, 153;
+    --freq-label: "60 GHz";
+}
+
 /* Цветовая полоса слева для radio по частоте */
-#cbi-wireless tr[data-freq="2.4"][data-radio-device] {
-    border-left: 4px solid #ff9800;
-}
-
-#cbi-wireless tr[data-freq="5"][data-radio-device] {
-    border-left: 4px solid #00bcd4;
-}
-
-#cbi-wireless tr[data-freq="6"][data-radio-device] {
-    border-left: 4px solid #a78bfa;
+#cbi-wireless tr[data-band][data-radio-device] {
+    border-left: 4px solid var(--freq-color, var(--proton-border));
 }
 
 #cbi-wireless tr[data-radio-device] td {
@@ -2142,82 +2170,35 @@ table.assoclist td[data-title="Скорость приёма / отправки"
     margin-left: auto;
 }
 
-/* WiFi 2.4 GHz - оранжевый акцент (по data-freq атрибуту) */
-#cbi-wireless tr[data-freq="2.4"][data-section-id]:not([data-radio-device]) {
-    border-left: 4px solid #ff9800;
+/* WiFi сети — цветовой акцент по частоте */
+#cbi-wireless tr[data-band][data-section-id]:not([data-radio-device]) {
+    border-left: 4px solid var(--freq-color, var(--proton-border));
 }
 
-#cbi-wireless tr[data-freq="2.4"][data-section-id]:not([data-radio-device]) td[data-name="_badge"] .ifacebadge {
+#cbi-wireless tr[data-band][data-section-id]:not([data-radio-device]) td[data-name="_badge"] .ifacebadge {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 152, 0, 0.05));
-    border: 1px solid rgba(255, 152, 0, 0.3);
+    background: linear-gradient(135deg, rgba(var(--freq-color-rgb, 128, 128, 128), 0.15), rgba(var(--freq-color-rgb, 128, 128, 128), 0.05));
+    border: 1px solid rgba(var(--freq-color-rgb, 128, 128, 128), 0.3);
     border-radius: var(--proton-radius-sm);
     padding: 8px 12px;
 }
 
-#cbi-wireless tr[data-freq="2.4"][data-section-id]:not([data-radio-device]) td[data-name="_badge"] .ifacebadge::after {
-    content: "2.4 GHz";
+#cbi-wireless tr[data-band][data-section-id]:not([data-radio-device]) td[data-name="_badge"] .ifacebadge::after {
+    content: var(--freq-label, "");
     padding: 4px 10px;
     border-radius: 10px;
     font-size: 0.7rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #ff9800, #ff6f00);
+    background: linear-gradient(135deg, var(--freq-color, #888), var(--freq-color-dark, #666));
     color: #fff;
     white-space: nowrap;
 }
 
-/* WiFi 5 GHz - голубой акцент (по data-freq атрибуту) */
-#cbi-wireless tr[data-freq="5"][data-section-id]:not([data-radio-device]) {
-    border-left: 4px solid #00bcd4;
-}
-
-#cbi-wireless tr[data-freq="5"][data-section-id]:not([data-radio-device]) td[data-name="_badge"] .ifacebadge {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: linear-gradient(135deg, rgba(0, 188, 212, 0.15), rgba(0, 188, 212, 0.05));
-    border: 1px solid rgba(0, 188, 212, 0.3);
-    border-radius: var(--proton-radius-sm);
-    padding: 8px 12px;
-}
-
-#cbi-wireless tr[data-freq="5"][data-section-id]:not([data-radio-device]) td[data-name="_badge"] .ifacebadge::after {
-    content: "5 GHz";
-    padding: 4px 10px;
-    border-radius: 10px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #00bcd4, #0097a7);
-    color: #fff;
-    white-space: nowrap;
-}
-
-/* WiFi 6 GHz - фиолетовый акцент (по data-freq атрибуту) */
-#cbi-wireless tr[data-freq="6"][data-section-id]:not([data-radio-device]) {
-    border-left: 4px solid #a78bfa;
-}
-
-#cbi-wireless tr[data-freq="6"][data-section-id]:not([data-radio-device]) td[data-name="_badge"] .ifacebadge {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(167, 139, 250, 0.05));
-    border: 1px solid rgba(167, 139, 250, 0.3);
-    border-radius: var(--proton-radius-sm);
-    padding: 8px 12px;
-}
-
-#cbi-wireless tr[data-freq="6"][data-section-id]:not([data-radio-device]) td[data-name="_badge"] .ifacebadge::after {
-    content: "6 GHz";
-    padding: 4px 10px;
-    border-radius: 10px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #a78bfa, #8b5cf6);
-    color: #fff;
-    white-space: nowrap;
+/* Скрываем пилюлю если band не определён */
+#cbi-wireless tr[data-section-id]:not([data-radio-device]):not([data-band]) td[data-name="_badge"] .ifacebadge::after {
+    display: none;
 }
 
 /* =====================================================
@@ -3497,9 +3478,17 @@ body[data-page^="admin-status"] .cbi-section>div>div[style*="display:grid"] {
     margin: 0;
 }
 
+/*
 body[data-page^="admin-status"] .cbi-section>div>div[style*="display:grid"]>.ifacebox {
     flex: 1 1 180px !important;
     min-width: 160px !important;
+    max-width: none !important;
+    margin: 0 !important;
+}*/
+
+body[data-page^="admin-status"] .cbi-section>div>div[style*="display:grid"]>.ifacebox {
+    flex: 1 1 100px !important;
+    min-width: 100px !important;
     max-width: none !important;
     margin: 0 !important;
 }
@@ -4195,6 +4184,12 @@ body.modal-overlay-active #modal_overlay {
         border-left: 3px solid transparent;
     }
 
+    #mainmenu .mainmenu.l1>li>a:active {
+        background: var(--proton-accent-glow);
+        color: var(--proton-accent);
+        border-left-color: var(--proton-accent);
+    }
+
     #mainmenu .mainmenu.l1>li.selected>a,
     #mainmenu li.selected>a {
         color: var(--proton-accent);
@@ -4205,6 +4200,11 @@ body.modal-overlay-active #modal_overlay {
     #mainmenu .mainmenu.l2>li>a {
         padding: 14px 60px;
         font-size: 0.9rem;
+    }
+
+    #mainmenu .mainmenu.l2>li>a:active {
+        background: var(--proton-accent-glow);
+        color: var(--proton-accent);
     }
 
     /* Restore mobile submenu expansion */
@@ -8388,8 +8388,9 @@ body[data-page="admin-status-overview"] .cbi-section:first-of-type table.table t
     }
 
     .proton-backup-btn {
-        flex: 1;
+        flex: 1 1 100%;
         min-width: 0;
+        width: 100%;
     }
 }
 
@@ -10485,14 +10486,17 @@ body.proton-custom-page .cbi-section-table-descr th {
         opacity: 0;
         transform: translateY(-10px);
     }
+
     20% {
         opacity: 1;
         transform: translateY(0);
     }
+
     80% {
         opacity: 1;
         transform: translateY(0);
     }
+
     100% {
         opacity: 0;
         transform: translateY(-10px);
@@ -10503,6 +10507,7 @@ body.proton-custom-page .cbi-section-table-descr th {
     from {
         opacity: 1;
     }
+
     to {
         opacity: 0;
     }
@@ -10513,6 +10518,7 @@ body.proton-custom-page .cbi-section-table-descr th {
         opacity: 0;
         transform: translateY(20px) scale(0.95);
     }
+
     to {
         opacity: 1;
         transform: translateY(0) scale(1);

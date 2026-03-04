@@ -9,6 +9,33 @@
 	const boardinfo = ubus.call('system', 'board');
 	const wirelessStatus = ubus.call('network.wireless', 'status') || {};
 
+	// Строим карту wireless-устройств из ubus:
+	// { radioName: { band: "2g"|"5g"|"6g", interfaces: ["default_radio0", ...] }, ... }
+	let wirelessMap = {};
+	for (let radioName in wirelessStatus) {
+		let radio = wirelessStatus[radioName];
+		let cfg = (radio && radio.config) ? radio.config : {};
+		let band = cfg.band || '';
+
+		// Fallback: определяем band из канала если band не указан
+		// NB: 6 GHz (ch 1-233) и 60 GHz (ch 1-6) пересекаются с 2.4 GHz,
+		// поэтому по каналу их различить нельзя — полагаемся на config.band
+		if (!band && cfg.channel) {
+			let ch = +cfg.channel;
+			if (ch >= 1 && ch <= 14) band = '2g';
+			else if (ch >= 32 && ch <= 177) band = '5g';
+		}
+
+		let interfaces = [];
+		let ifaces = (radio && type(radio.interfaces) == 'array') ? radio.interfaces : [];
+		for (let iface in ifaces) {
+			if (iface && iface.section)
+				push(interfaces, iface.section);
+		}
+
+		wirelessMap[radioName] = { band: band, interfaces: interfaces };
+	}
+
 	http.prepare_content('text/html; charset=UTF-8');
 -%}
 
@@ -40,23 +67,27 @@
 	else if (r === 'extra') document.documentElement.classList.add('proton-radius-extra');
 	var a = localStorage.getItem('proton-accent-color') || 'blue';
 	var c = {
-		default: { accent: '#4b5563', hover: '#374151', glow: 'rgba(75, 85, 99, 0.22)' },
-		blue:    { accent: '#5e9eff', hover: '#7db2ff', glow: 'rgba(94, 158, 255, 0.18)' },
-		purple:  { accent: '#a78bfa', hover: '#c3b4ff', glow: 'rgba(167, 139, 250, 0.22)' },
-		green:   { accent: '#34d399', hover: '#2fb885', glow: 'rgba(52, 211, 153, 0.18)' },
-		orange:  { accent: '#fb923c', hover: '#f47c1f', glow: 'rgba(251, 146, 60, 0.20)' },
-		red:     { accent: '#f87171', hover: '#f04c4c', glow: 'rgba(248, 113, 113, 0.20)' }
+		default: { accent: '#4b5563', hover: '#374151', glow: 'rgba(75, 85, 99, 0.22)', rgb: '75, 85, 99' },
+		blue:    { accent: '#5e9eff', hover: '#7db2ff', glow: 'rgba(94, 158, 255, 0.18)', rgb: '94, 158, 255' },
+		purple:  { accent: '#a78bfa', hover: '#c3b4ff', glow: 'rgba(167, 139, 250, 0.22)', rgb: '167, 139, 250' },
+		green:   { accent: '#34d399', hover: '#2fb885', glow: 'rgba(52, 211, 153, 0.18)', rgb: '52, 211, 153' },
+		orange:  { accent: '#fb923c', hover: '#f47c1f', glow: 'rgba(251, 146, 60, 0.20)', rgb: '251, 146, 60' },
+		red:     { accent: '#f87171', hover: '#f04c4c', glow: 'rgba(248, 113, 113, 0.20)', rgb: '248, 113, 113' }
 	};
 	if (c[a]) {
 		document.documentElement.style.setProperty('--proton-accent', c[a].accent);
 		document.documentElement.style.setProperty('--proton-accent-hover', c[a].hover);
 		document.documentElement.style.setProperty('--proton-accent-glow', c[a].glow);
+		document.documentElement.style.setProperty('--proton-accent-rgb', c[a].rgb);
 	}
 	if (localStorage.getItem('proton-animations') === 'false') document.documentElement.classList.add('proton-no-animations');
 	var pw = localStorage.getItem('proton-page-width');
 	if (pw && parseInt(pw) > 0 && window.innerWidth >= 800) {
 		document.documentElement.style.setProperty('--proton-page-max-width', pw + '%');
 	}
+	// Устанавливаем фоновый цвет ДО загрузки cascade.css, чтобы избежать мерцания градиента
+	var bgSolid = themeMode === 'light' ? '#ffffff' : '#0f1419';
+	document.documentElement.style.setProperty('background-color', bgSolid);
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -67,6 +98,31 @@
 <link rel="preload" href="{{ media }}/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="preload" href="{{ media }}/fonts/inter-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
 <style>
+/* Critical: background and gradient before cascade.css to prevent FOUC */
+html {
+	height: 100%;
+	background-color: #0f1419;
+}
+:root[data-theme="light"] {
+	background-color: #ffffff;
+}
+body {
+	min-height: 100%;
+	margin: 0;
+	background-color: inherit;
+	background-image:
+		radial-gradient(circle at 20% 30%, rgba(var(--proton-accent-rgb, 94, 158, 255), 0.06) 0%, transparent 50%),
+		radial-gradient(circle at 80% 70%, rgba(var(--proton-accent-rgb, 94, 158, 255), 0.03) 0%, transparent 50%),
+		linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%);
+	background-attachment: fixed;
+}
+:root[data-theme="light"] body {
+	background-image:
+		radial-gradient(circle at 20% 30%, rgba(var(--proton-accent-rgb, 75, 85, 99), 0.04) 0%, transparent 50%),
+		radial-gradient(circle at 80% 70%, rgba(var(--proton-accent-rgb, 75, 85, 99), 0.025) 0%, transparent 50%),
+		linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+}
+
 /* Critical: keep header height stable before cascade.css loads */
 :root {
 	--proton-page-max-width: 990px;
@@ -135,17 +191,30 @@
 	var mediaBase = '{{ media }}';
 	var localIconBase = mediaBase + '/icons/';
 
-	// Имена wireless-устройств из ubus (server-side, zero HTTP overhead)
-	// radio0/radio1 на стандартном OpenWrt, MT7981_1_1/MT7981_1_2 на MTK и т.д.
-	var _protonWirelessDeviceList = {{ sprintf('%J', keys(wirelessStatus)) }};
-	window._protonWirelessDevices = new Set(_protonWirelessDeviceList);
+	// Полная карта wireless-устройств из ubus (server-side, zero HTTP overhead)
+	// Содержит band и список интерфейсов для каждого radio
+	// Пример: { "radio0": { band: "2g", interfaces: ["default_radio0"] }, "MT7981_1_1": { band: "5g", interfaces: ["default_MT7981_1_1"] } }
+	var _protonWirelessMap = {{ sprintf('%J', wirelessMap) }};
+	window._protonWirelessMap = _protonWirelessMap;
+
+	// Set для быстрой проверки имён устройств (обратная совместимость)
+	var _deviceNames = Object.keys(_protonWirelessMap);
+	window._protonWirelessDevices = new Set(_deviceNames);
+
+	// Обратная карта: UCI section → radioName (для быстрого маппинга AP → radio)
+	var _ifaceToRadio = {};
+	for (var rn = 0; rn < _deviceNames.length; rn++) {
+		var radioName = _deviceNames[rn];
+		var ifaces = _protonWirelessMap[radioName].interfaces || [];
+		for (var ii = 0; ii < ifaces.length; ii++) {
+			_ifaceToRadio[ifaces[ii]] = radioName;
+		}
+	}
+	window._protonIfaceToRadio = _ifaceToRadio;
 
 	// Проверяет, является ли имя wireless-устройством (radio)
 	function isWirelessDevice(name) {
-		if (window._protonWirelessDevices && window._protonWirelessDevices.size > 0) {
-			return window._protonWirelessDevices.has(name);
-		}
-		return /^radio\d+$/.test(name); // fallback для стандартных имён
+		return window._protonWirelessDevices && window._protonWirelessDevices.has(name);
 	}
 
 	// Паттерны для разных типов иконок
@@ -175,11 +244,25 @@
 
 				// Для физических радио (radio0, radio1, MT7981_1_1, ...) используем иконку вышки вместо wifi
 				if (iconName === 'wifi') {
-					var badge = img.closest('.ifacebadge');
-					if (badge) {
-						var text = badge.textContent.trim();
-						if (isWirelessDevice(text)) {
-							iconName = 'radio';
+					// 1. Надёжнее всего: строка уже помечена markRadioDevicesAndFreq()
+					if (img.closest('tr[data-radio-device]')) {
+						iconName = 'radio';
+					} else {
+						var badge = img.closest('.ifacebadge');
+						if (badge) {
+							var text = badge.textContent.trim();
+							// 2. Точное совпадение (radio0, radio1, ...)
+							if (isWirelessDevice(text)) {
+								iconName = 'radio';
+							// 3. Подстрока — на случай если badge содержит доп. текст (MT7981_1_1 + канал и т.п.)
+							} else if (window._protonWirelessDevices) {
+								for (var di = 0, devs = Array.from(window._protonWirelessDevices); di < devs.length; di++) {
+									if (text.indexOf(devs[di]) !== -1) {
+										iconName = 'radio';
+										break;
+									}
+								}
+							}
 						}
 					}
 				}
@@ -198,29 +281,53 @@
 		for (var i = 0; i < imgs.length; i++) remapIcon(imgs[i]);
 	}
 
-	// Проставляем data-radio-device для wireless-устройств и data-freq для WiFi-сетей
+	// Проставляем data-radio-device и data-band для wireless-строк
+	// JS отвечает только за структуру (какой band), CSS — за визуал (цвета)
+	// Данные приходят из ubus (server-side карта), без regex-парсинга текста
 	// Работает с любыми именами устройств: radio0, MT7981_1_1, ath0, wl0 и т.д.
+
 	function markRadioDevicesAndFreq() {
 		var table = document.querySelector('#cbi-wireless table.cbi-section-table');
 		if (!table) return;
 
 		var rows = table.querySelectorAll('tr[data-section-id]');
-		var currentFreq = null;
+		var currentBand = null;
 
 		for (var i = 0; i < rows.length; i++) {
 			var row = rows[i];
 			var sectionId = row.getAttribute('data-section-id') || '';
 
-			// Если это wireless-устройство — ставим маркер и запоминаем частоту
+			// 1. Это radio-устройство? (проверяем по серверной карте)
 			if (isWirelessDevice(sectionId)) {
-				row.setAttribute('data-radio-device', sectionId);
-				currentFreq = row.getAttribute('data-freq');
+				if (!row.hasAttribute('data-radio-device')) {
+					row.setAttribute('data-radio-device', sectionId);
+				}
+				var mapEntry = _protonWirelessMap[sectionId];
+				currentBand = mapEntry ? mapEntry.band : null;
+
+				if (currentBand && !row.hasAttribute('data-band')) {
+					row.setAttribute('data-band', currentBand);
+				}
 				continue;
 			}
 
-			// Всё остальное — WiFi-сети. Если нет data-freq, проставляем от родительского radio
-			if (!row.hasAttribute('data-freq') && currentFreq) {
-				row.setAttribute('data-freq', currentFreq);
+			// 2. Это WiFi-сеть — пытаемся найти band через обратную карту iface→radio
+			if (!row.hasAttribute('data-band')) {
+				var parentRadio = _ifaceToRadio[sectionId];
+				var band = null;
+
+				if (parentRadio && _protonWirelessMap[parentRadio]) {
+					band = _protonWirelessMap[parentRadio].band;
+				}
+
+				// 3. Fallback: используем band от последнего встреченного radio (порядок DOM)
+				if (!band && currentBand) {
+					band = currentBand;
+				}
+
+				if (band) {
+					row.setAttribute('data-band', band);
+				}
 			}
 		}
 	}
@@ -230,6 +337,9 @@
 		markRadioDevicesAndFreq();
 
 		var mo = new MutationObserver(function(mutations) {
+			// Сначала помечаем radio-строки, чтобы remapIcon() мог на них опираться
+			markRadioDevicesAndFreq();
+
 			for (var i = 0; i < mutations.length; i++) {
 				var m = mutations[i];
 				if (m.type === 'attributes' && m.attributeName === 'src') {
@@ -242,8 +352,6 @@
 					}
 				}
 			}
-			// Всегда проверяем radio-device маркеры и data-freq после любых изменений в DOM
-			markRadioDevicesAndFreq();
 		});
 
 		mo.observe(document.documentElement, {
