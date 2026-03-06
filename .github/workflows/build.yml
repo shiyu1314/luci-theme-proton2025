@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Environment info
         run: |
+          TAG="$(date +'%Y%m%d')-$(openssl rand -hex 3)"
+          echo "tag=$TAG" >> $GITHUB_ENV
           echo -e "Total CPU cores\t: $(nproc)"
           grep -m1 model /proc/cpuinfo
           free -h
@@ -73,5 +75,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.release_tag }}-${{env.tag}}
+          tag_name: ${{env.tag}}
           files: ${{ steps.build.outputs.TARGET }}
+
