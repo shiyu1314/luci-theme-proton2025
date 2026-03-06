@@ -71,6 +71,7 @@
         sshd: { category: "security", icon: "🔐" },
 
         // VPN
+        momo: { category: "vpn", icon: "🔒" },
         openvpn: { category: "vpn", icon: "🔒" },
         wireguard: { category: "vpn", icon: "🔒", daemon: false },
         zerotier: { category: "vpn", icon: "🔒" },
@@ -84,7 +85,6 @@
         ssr: { category: "vpn", icon: "🔒" },
         trojan: { category: "vpn", icon: "🔒" },
         singbox: { category: "vpn", icon: "🔒" },
-        "sing-box": { category: "vpn", icon: "🔒" },
         podkop: { category: "vpn", icon: "🔒", daemon: false },
 
         // AdBlock / DNS фильтрация
@@ -410,13 +410,13 @@
     loadServices() {
       const saved = this._safeGetItem("proton-services-widget");
       // Если ничего не сохранено - показываем дефолтные сервисы
-      if (saved === null || saved === undefined) return ["dnsmasq", "dropbear"];
+      if (saved === null || saved === undefined) return ["dnsmasq", "dropbear", "momo"];
       // Если сохранён пустой массив - возвращаем пустой (пользователь специально очистил)
       try {
         const parsed = JSON.parse(saved);
         return this._normalizeServiceList(parsed);
       } catch (e) {
-        return ["dnsmasq", "dropbear"];
+        return ["dnsmasq", "dropbear", "momo"];
       }
     }
 
@@ -2987,3 +2987,5 @@
     }
   }
 })();
+
+

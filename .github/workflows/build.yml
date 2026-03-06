@@ -1,238 +1,89 @@
-name: Build IPK & APK Packages
+name: Release
 
 on:
-  push:
-    branches: [main, master]
-    tags:
-      - "v*"
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
-
-permissions:
-  contents: write
+    inputs:
+      sdk_version:
+        description: '编译SDK版本'
+        required: true
+        default: '25.12.0'
+        type: choice
+        options:
+        - 25.12.0
+      build_flags:
+        description: '编译选项'
+        required: false
+        type: string
+        default: 'V=s'
 
 jobs:
   build:
-    name: Build LuCI Theme Packages
+    name: Build with ${{ inputs.sdk_version }} ${{ inputs.build_flags }}
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
+      - name: Environment info
+        run: |
+          TAG="$(date +'%Y%m%d')-$(openssl rand -hex 3)"
+          echo "tag=$TAG" >> $GITHUB_ENV
+          echo -e "Total CPU cores\t: $(nproc)"
+          grep -m1 model /proc/cpuinfo
+          free -h
+          uname -a
+          [ -f /proc/version ] && cat /proc/version
+          [ -f /etc/issue.net ] && cat /etc/issue.net
+          ulimit -a
+
+      - name: Download OpenWRT SDK v${{ inputs.sdk_version }}
+        run: |
+          wget -rLl1 -nd -P ${{ runner.tool_cache }}/openwrt-sdk --reject-regex /$ --progress=dot:giga \
+            https://archive.openwrt.org/releases/${{ inputs.sdk_version }}/targets/x86/64/ -A openwrt-sdk-*.tar.*
+          cd ${{ runner.tool_cache }}/openwrt-sdk
+          tar --strip-components=1 -xf openwrt-sdk-*.tar.*
+          rm openwrt-sdk-*.tar.*
+
+      - name: Install feeds
+        working-directory: '${{ runner.tool_cache }}/openwrt-sdk'
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get version
-        id: version
+      - name: Configure
+        working-directory: '${{ runner.tool_cache }}/openwrt-sdk'
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          else
-            VERSION="1.0.0-$(date +%Y%m%d)-${GITHUB_SHA::7}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          ln -sf $GITHUB_WORKSPACE package/luci-theme-proton2025
+          echo "CONFIG_PACKAGE_luci-theme-proton2025=y" >> .config
+          make defconfig
 
-      - name: Prepare package files
-        id: prepare
+      - name: Build
+        id: build
+        working-directory: '${{ runner.tool_cache }}/openwrt-sdk'
         run: |
-          PKG_NAME="luci-theme-proton2025"
-
-          # Создаём общую структуру данных
-          mkdir -p pkg-data/www/luci-static/proton2025
-          mkdir -p pkg-data/www/luci-static/resources
-          mkdir -p pkg-data/usr/share/ucode/luci/template/themes/proton2025
-          mkdir -p pkg-data/usr/share/rpcd/acl.d
-          mkdir -p pkg-data/usr/share/rpcd/ucode
-          mkdir -p pkg-data/etc/uci-defaults
-          mkdir -p pkg-data/etc/config
-
-          # Копируем файлы темы
-          cp -r htdocs/luci-static/proton2025/* pkg-data/www/luci-static/proton2025/
-          cp -r ucode/template/themes/proton2025/* pkg-data/usr/share/ucode/luci/template/themes/proton2025/
-          cp root/etc/uci-defaults/30_luci-theme-proton2025 pkg-data/etc/uci-defaults/
-
-          # Копируем конфиг
-          if [ -f "root/etc/config/proton2025" ]; then
-            cp root/etc/config/proton2025 pkg-data/etc/config/
-          fi
-
-          # Копируем RPC модули и ACL
-          if [ -f "root/usr/share/rpcd/ucode/luci.proton-temp" ]; then
-            cp root/usr/share/rpcd/ucode/luci.proton-temp pkg-data/usr/share/rpcd/ucode/
-          fi
-          if [ -f "root/usr/share/rpcd/ucode/luci.proton-settings" ]; then
-            cp root/usr/share/rpcd/ucode/luci.proton-settings pkg-data/usr/share/rpcd/ucode/
-          fi
-          if [ -f "root/usr/share/rpcd/acl.d/luci-theme-proton2025.json" ]; then
-            cp root/usr/share/rpcd/acl.d/luci-theme-proton2025.json pkg-data/usr/share/rpcd/acl.d/
-          fi
-
-          # Копируем JS меню
-          if [ -d "htdocs/luci-static/resources" ]; then
-            cp -r htdocs/luci-static/resources/* pkg-data/www/luci-static/resources/ 2>/dev/null || true
-          fi
-
-          # Вычисляем размер
-          INSTALLED_SIZE=$(du -sb pkg-data | cut -f1)
-          echo "size=$INSTALLED_SIZE" >> $GITHUB_OUTPUT
-
-      - name: Build IPK (for OpenWrt with opkg)
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          PKG_NAME="luci-theme-proton2025"
-          INSTALLED_SIZE="${{ steps.prepare.outputs.size }}"
-
-          mkdir -p ipk-build/control
-          mkdir -p ipk-build/data
-          cp -r pkg-data/* ipk-build/data/
-
-          # Создаём control файл
-          cat > ipk-build/control/control << 'CONTROL_END'
-          Package: luci-theme-proton2025
-          Depends: libc, luci-base
-          License: Apache-2.0
-          Section: luci
-          Architecture: all
-          Description: Proton2025 - Elegant Dark Theme for LuCI
-          CONTROL_END
-          sed -i 's/^[[:space:]]*//' ipk-build/control/control
-          sed -i "1s/.*/Package: ${PKG_NAME}/" ipk-build/control/control
-          sed -i "2i Version: ${VERSION}" ipk-build/control/control
-          sed -i "4i Source: https://github.com/${{ github.repository }}" ipk-build/control/control
-          sed -i "5i SourceName: ${PKG_NAME}" ipk-build/control/control
-          sed -i "/Architecture/a Installed-Size: ${INSTALLED_SIZE}" ipk-build/control/control
-
-          # Создаём postinst скрипт
-          cat > ipk-build/control/postinst << 'POSTINST_END'
-          #!/bin/sh
-          [ -n "${IPKG_INSTROOT}" ] || {
-            uci -q set luci.themes.Proton2025=/luci-static/proton2025
-            uci -q commit luci
-            /etc/init.d/rpcd restart 2>/dev/null || true
-          }
-          exit 0
-          POSTINST_END
-          sed -i 's/^[[:space:]]*//' ipk-build/control/postinst
-          chmod 755 ipk-build/control/postinst
-
-          # Создаём prerm скрипт
-          cat > ipk-build/control/prerm << 'PRERM_END'
-          #!/bin/sh
-          [ -n "${IPKG_INSTROOT}" ] || {
-            uci -q delete luci.themes.Proton2025
-            uci -q commit luci
-          }
-          exit 0
-          PRERM_END
-          sed -i 's/^[[:space:]]*//' ipk-build/control/prerm
-          chmod 755 ipk-build/control/prerm
-
-          # Собираем IPK
-          cd ipk-build/control && tar czvf ../control.tar.gz . && cd ../..
-          cd ipk-build/data && tar czvf ../data.tar.gz . && cd ../..
-          echo "2.0" > ipk-build/debian-binary
-          cd ipk-build && tar czvf "../${PKG_NAME}_${VERSION}_all.ipk" ./debian-binary ./control.tar.gz ./data.tar.gz && cd ..
-
-          echo "Built IPK: ${PKG_NAME}_${VERSION}_all.ipk"
-          ls -la *.ipk
-
-      - name: Build APK (for OpenWrt 24.10+ with apk)
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          PKG_NAME="luci-theme-proton2025"
-          INSTALLED_SIZE="${{ steps.prepare.outputs.size }}"
-
-          mkdir -p apk-build
-
-          # Копируем файлы с правильной структурой (без префикса /)
-          cp -r pkg-data/* apk-build/
-
-          # Создаём .PKGINFO (метаданные APK пакета) с правильным форматом
-          cat > apk-build/.PKGINFO << PKGINFO_END
-          pkgname = ${PKG_NAME}
-          pkgver = ${VERSION}-r1
-          pkgdesc = Proton2025 - Elegant Dark Theme for LuCI
-          url = https://github.com/${{ github.repository }}
-          size = ${INSTALLED_SIZE}
-          arch = noarch
-          license = Apache-2.0
-          origin = ${PKG_NAME}
-          depend = luci-base
-          PKGINFO_END
-
-          # Создаём .post-install скрипт
-          cat > apk-build/.post-install << 'POSTINSTALL_END'
-          #!/bin/sh
-          uci -q set luci.themes.Proton2025=/luci-static/proton2025
-          uci -q commit luci
-          /etc/init.d/rpcd restart 2>/dev/null || true
-          exit 0
-          POSTINSTALL_END
-          chmod 755 apk-build/.post-install
-
-          # Создаём .pre-deinstall скрипт
-          cat > apk-build/.pre-deinstall << 'PREDEINSTALL_END'
-          #!/bin/sh
-          uci -q delete luci.themes.Proton2025
-          uci -q commit luci
-          exit 0
-          PREDEINSTALL_END
-          chmod 755 apk-build/.pre-deinstall
-
-          # Собираем APK (Alpine Package format)
-          # APK требует gzip сжатие и определенный порядок файлов
-          cd apk-build
-
-          # Создаем список файлов для архива (метаданные идут первыми)
-          find . -type f -o -type l | grep -v '^\./\.' | sort > .file-list
-
-          # Упаковываем: сначала метаданные, потом файлы
-          tar -czf "../${PKG_NAME}_${VERSION}_all.apk" \
-            --owner=0 --group=0 \
-            --numeric-owner \
-            .PKGINFO .post-install .pre-deinstall \
-            $(cat .file-list)
-
-          cd ..
-
-          echo "Built APK: ${PKG_NAME}_${VERSION}_all.apk"
-          ls -lh *.apk
-
-      - name: Upload IPK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: luci-theme-proton2025-ipk
-          path: "*.ipk"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: luci-theme-proton2025-apk
-          path: "*.apk"
-
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            *.ipk
-            *.apk
-          body: |
-            ## Proton2025 Theme v${{ steps.version.outputs.version }}
-
-            ### 📦 Packages
-            - **`.ipk`** — для OpenWrt с opkg (версии до 24.x)
-            - **`.apk`** — для OpenWrt с apk (версии 24.10+)
-
-            ### 🔧 Установка
-
-            **opkg (IPK):**
-            ```bash
-            opkg install luci-theme-proton2025_*.ipk
-            ```
-
-            **apk (APK):**
-            ```bash
-            apk add --allow-untrusted luci-theme-proton2025_*.apk
-            ```
+          make package/luci-theme-proton2025/compile -j$(nproc) ${{ inputs.build_flags }}
+          TARGET=$(echo bin/packages/x86_64/base/luci-theme-proton2025*.*)
+          echo "TARGET=$(pwd)/$TARGET" | tee -a $GITHUB_OUTPUT
+          
+          
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{env.tag}}
+          files: ${{ steps.build.outputs.TARGET }}
+
+      - name: Delete old releases
+        uses: dev-drprasad/delete-older-releases@v0.3.4
+        with:
+          keep_latest: 1
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+
+
