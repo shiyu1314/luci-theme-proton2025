@@ -21,7 +21,7 @@ PKG_LICENSE:=Apache-2.0
 define Package/luci-theme-proton2025/postrm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
-	uci -q delete luci.themes.proton2025
+	uci -q delete luci.themes.Proton2025
 	uci set luci.main.mediaurlbase='/luci-static/bootstrap'
 	uci commit luci
 }
@@ -30,4 +30,5 @@ endef
 include $(TOPDIR)/feeds/luci/luci.mk
 
 $(eval $(call BuildPackage,$(PKG_NAME)))
+
 
