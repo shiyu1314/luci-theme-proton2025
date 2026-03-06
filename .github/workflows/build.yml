@@ -78,3 +78,12 @@ jobs:
           tag_name: ${{env.tag}}
           files: ${{ steps.build.outputs.TARGET }}
 
+      - name: Delete old releases
+        uses: dev-drprasad/delete-older-releases@v0.3.4
+        with:
+          keep_latest: 1
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+
+
