@@ -12,7 +12,7 @@ fi
 
 if ! uci -q get luci.themes.Proton2025 >/dev/null; then
 	uci set luci.themes.Proton2025="/luci-static/proton2025"
-    uci set luci.main.mediaurlbase=/luci-static/material3
+    uci set luci.main.mediaurlbase=/luci-static/proton2025
 	uci commit luci
 fi
 
