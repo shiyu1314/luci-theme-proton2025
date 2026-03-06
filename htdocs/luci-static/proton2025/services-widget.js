@@ -84,7 +84,7 @@
         passwall2: { category: "vpn", icon: "🔒" },
         ssr: { category: "vpn", icon: "🔒" },
         trojan: { category: "vpn", icon: "🔒" },
-        sing-box: { category: "vpn", icon: "🔒" },
+        singbox: { category: "vpn", icon: "🔒" },
         podkop: { category: "vpn", icon: "🔒", daemon: false },
 
         // AdBlock / DNS фильтрация
@@ -2987,4 +2987,5 @@
     }
   }
 })();
+
 
